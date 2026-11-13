@@ -1,0 +1,512 @@
+{
+  "name": "Order Export Failsafe (DRAFT)",
+  "flow": [
+    {
+      "id": 1,
+      "module": "gateway:CustomWebHook",
+      "version": 1,
+      "parameters": {
+        "hook": null,
+        "maxResults": 1
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": {
+          "x": 0,
+          "y": 0,
+          "name": "ERP order created (webhook)"
+        }
+      }
+    },
+    {
+      "id": 12,
+      "module": "json:TransformToJSON",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "object": "{{1.lines}}",
+        "space": ""
+      },
+      "metadata": {
+        "designer": {
+          "x": 150,
+          "y": -120,
+          "name": "Serialize order lines"
+        }
+      }
+    },
+    {
+      "id": 13,
+      "module": "json:TransformToJSON",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "object": "{{1.customer}}",
+        "space": ""
+      },
+      "metadata": {
+        "designer": {
+          "x": 130,
+          "y": -250,
+          "name": "Serialize customer"
+        }
+      }
+    },
+    {
+      "id": 14,
+      "module": "json:TransformToJSON",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "object": "{{1.shipping_address}}",
+        "space": ""
+      },
+      "metadata": {
+        "designer": {
+          "x": 260,
+          "y": -250,
+          "name": "Serialize address"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "module": "http:ActionSendData",
+      "version": 3,
+      "parameters": {
+        "handleErrors": true,
+        "useNewZLibDeCompress": true
+      },
+      "mapper": {
+        "url": "https://YOUR-SERVICE-HOST/orders/validate",
+        "method": "post",
+        "headers": [
+          {
+            "name": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "qs": [],
+        "bodyType": "raw",
+        "parseResponse": true,
+        "contentType": "application/json",
+        "data": "{\"order_ref\": \"{{1.order_ref}}\", \"customer\": {{13.json}}, \"shipping_address\": {{14.json}}, \"shipping_method\": \"{{1.shipping_method}}\", \"lines\": {{12.json}}}",
+        "timeout": "30",
+        "serializeUrl": false,
+        "shareCookies": false,
+        "rejectUnauthorized": true,
+        "followRedirect": true,
+        "useQuerystring": false,
+        "gzip": true,
+        "useMtls": false,
+        "followAllRedirects": false
+      },
+      "onerror": [
+        {
+          "id": 21,
+          "module": "builtin:Break",
+          "version": 1,
+          "parameters": {
+            "count": 3,
+            "interval": 15,
+            "retry": true
+          },
+          "mapper": {},
+          "metadata": {
+            "designer": {
+              "x": 300,
+              "y": 300,
+              "name": "Service unreachable: retry, then incomplete execution"
+            }
+          }
+        }
+      ],
+      "metadata": {
+        "designer": {
+          "x": 300,
+          "y": 0,
+          "name": "Validate order (failsafe service)"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "module": "builtin:BasicRouter",
+      "version": 1,
+      "mapper": null,
+      "metadata": {
+        "designer": {
+          "x": 600,
+          "y": 0,
+          "name": "Route on decision"
+        }
+      },
+      "routes": [
+        {
+          "flow": [
+            {
+              "id": 4,
+              "module": "http:ActionSendData",
+              "version": 3,
+              "filter": {
+                "name": "Order invalid",
+                "conditions": [
+                  [
+                    {
+                      "a": "{{2.data.decision}}",
+                      "b": "INVALID",
+                      "o": "text:equal"
+                    }
+                  ]
+                ]
+              },
+              "parameters": {
+                "handleErrors": true
+              },
+              "mapper": {
+                "url": "https://YOUR-ALERT-WEBHOOK/ops",
+                "method": "post",
+                "headers": [
+                  {
+                    "name": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "bodyType": "raw",
+                "parseResponse": false,
+                "contentType": "application/json",
+                "data": "{\"topic\": \"order-invalid\", \"order_ref\": \"{{2.data.evidence.order_ref}}\", \"reason\": \"{{2.data.reason}}\", \"gap_count\": \"{{length(2.data.evidence.gaps)}}\"}",
+                "timeout": "30",
+                "serializeUrl": false,
+                "shareCookies": false,
+                "rejectUnauthorized": true,
+                "followRedirect": true,
+                "useQuerystring": false,
+                "gzip": true,
+                "useMtls": false,
+                "followAllRedirects": false
+              },
+              "onerror": [
+                {
+                  "id": 41,
+                  "module": "builtin:Ignore",
+                  "version": 1,
+                  "parameters": {},
+                  "mapper": {},
+                  "metadata": {
+                    "designer": {
+                      "x": 1200,
+                      "y": 600,
+                      "name": "Alert channel down must not kill the run"
+                    }
+                  }
+                }
+              ],
+              "metadata": {
+                "designer": {
+                  "x": 900,
+                  "y": 300,
+                  "name": "Alert ops with the gap list"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "flow": [
+            {
+              "id": 5,
+              "module": "http:ActionSendData",
+              "version": 3,
+              "filter": {
+                "name": "Order valid",
+                "conditions": [
+                  [
+                    {
+                      "a": "{{2.data.decision}}",
+                      "b": "VALID",
+                      "o": "text:equal"
+                    }
+                  ]
+                ]
+              },
+              "parameters": {
+                "handleErrors": true
+              },
+              "mapper": {
+                "url": "https://YOUR-SERVICE-HOST/map/shipping-method",
+                "method": "post",
+                "headers": [
+                  {
+                    "name": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "bodyType": "raw",
+                "parseResponse": true,
+                "contentType": "application/json",
+                "data": "{\"value\": \"{{1.shipping_method}}\"}",
+                "timeout": "30",
+                "serializeUrl": false,
+                "shareCookies": false,
+                "rejectUnauthorized": true,
+                "followRedirect": true,
+                "useQuerystring": false,
+                "gzip": true,
+                "useMtls": false,
+                "followAllRedirects": false
+              },
+              "onerror": [
+                {
+                  "id": 51,
+                  "module": "builtin:Break",
+                  "version": 1,
+                  "parameters": {
+                    "count": 3,
+                    "interval": 15,
+                    "retry": true
+                  },
+                  "mapper": {},
+                  "metadata": {
+                    "designer": {
+                      "x": 1200,
+                      "y": 300,
+                      "name": "Retry mapping service"
+                    }
+                  }
+                }
+              ],
+              "metadata": {
+                "designer": {
+                  "x": 900,
+                  "y": 0,
+                  "name": "Map shipping method (ladder)"
+                }
+              }
+            },
+            {
+              "id": 6,
+              "module": "builtin:BasicRouter",
+              "version": 1,
+              "mapper": null,
+              "metadata": {
+                "designer": {
+                  "x": 1200,
+                  "y": 0,
+                  "name": "Route on mapping decision"
+                }
+              },
+              "routes": [
+                {
+                  "flow": [
+                    {
+                      "id": 7,
+                      "module": "http:ActionSendData",
+                      "version": 3,
+                      "filter": {
+                        "name": "Unmapped method",
+                        "conditions": [
+                          [
+                            {
+                              "a": "{{5.data.decision}}",
+                              "b": "UNMAPPED",
+                              "o": "text:equal"
+                            }
+                          ]
+                        ]
+                      },
+                      "parameters": {
+                        "handleErrors": true
+                      },
+                      "mapper": {
+                        "url": "https://YOUR-ALERT-WEBHOOK/ops",
+                        "method": "post",
+                        "headers": [
+                          {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                          }
+                        ],
+                        "bodyType": "raw",
+                        "parseResponse": false,
+                        "contentType": "application/json",
+                        "data": "{\"topic\": \"shipping-method-unmapped\", \"order_ref\": \"{{1.order_ref}}\", \"input_value\": \"{{1.shipping_method}}\", \"reason\": \"{{5.data.reason}}\"}",
+                        "timeout": "30",
+                        "serializeUrl": false,
+                        "shareCookies": false,
+                        "rejectUnauthorized": true,
+                        "followRedirect": true,
+                        "useQuerystring": false,
+                        "gzip": true,
+                        "useMtls": false,
+                        "followAllRedirects": false
+                      },
+                      "onerror": [
+                        {
+                          "id": 71,
+                          "module": "builtin:Ignore",
+                          "version": 1,
+                          "parameters": {},
+                          "mapper": {},
+                          "metadata": {
+                            "designer": {
+                              "x": 1800,
+                              "y": 600,
+                              "name": "Never crash on alert"
+                            }
+                          }
+                        }
+                      ],
+                      "metadata": {
+                        "designer": {
+                          "x": 1500,
+                          "y": 300,
+                          "name": "Hold order, send candidates to a human"
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "flow": [
+                    {
+                      "id": 8,
+                      "module": "http:ActionSendData",
+                      "version": 3,
+                      "filter": {
+                        "name": "Method mapped",
+                        "conditions": [
+                          [
+                            {
+                              "a": "{{5.data.decision}}",
+                              "b": "UNMAPPED",
+                              "o": "text:notequal"
+                            }
+                          ]
+                        ]
+                      },
+                      "parameters": {
+                        "handleErrors": true
+                      },
+                      "mapper": {
+                        "url": "https://YOUR-3PL-API/orders",
+                        "method": "post",
+                        "headers": [
+                          {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                          }
+                        ],
+                        "bodyType": "raw",
+                        "parseResponse": true,
+                        "contentType": "application/json",
+                        "data": "{\"order_ref\": \"{{1.order_ref}}\", \"mapped_method_id\": \"{{5.data.method.method_id}}\", \"mapped_method_name\": \"{{5.data.method.name}}\", \"lines\": {{12.json}}}",
+                        "timeout": "60",
+                        "serializeUrl": false,
+                        "shareCookies": false,
+                        "rejectUnauthorized": true,
+                        "followRedirect": true,
+                        "useQuerystring": false,
+                        "gzip": true,
+                        "useMtls": false,
+                        "followAllRedirects": false
+                      },
+                      "onerror": [
+                        {
+                          "id": 81,
+                          "module": "http:ActionSendData",
+                          "version": 3,
+                          "parameters": {
+                            "handleErrors": false
+                          },
+                          "mapper": {
+                            "url": "https://YOUR-ALERT-WEBHOOK/ops",
+                            "method": "post",
+                            "headers": [
+                              {
+                                "name": "Content-Type",
+                                "value": "application/json"
+                              }
+                            ],
+                            "bodyType": "raw",
+                            "parseResponse": false,
+                            "contentType": "application/json",
+                            "data": "{\"topic\": \"3pl-create-failed\", \"order_ref\": \"{{1.order_ref}}\"}",
+                            "timeout": "30",
+                            "serializeUrl": false,
+                            "shareCookies": false,
+                            "rejectUnauthorized": true,
+                            "followRedirect": true,
+                            "useQuerystring": false,
+                            "gzip": true,
+                            "useMtls": false,
+                            "followAllRedirects": false
+                          },
+                          "metadata": {
+                            "designer": {
+                              "x": 2100,
+                              "y": 300,
+                              "name": "Tell ops before breaking"
+                            }
+                          }
+                        },
+                        {
+                          "id": 82,
+                          "module": "builtin:Break",
+                          "version": 1,
+                          "parameters": {
+                            "count": 5,
+                            "interval": 30,
+                            "retry": true
+                          },
+                          "mapper": {},
+                          "metadata": {
+                            "designer": {
+                              "x": 2400,
+                              "y": 300,
+                              "name": "Retry 3PL with backoff, keep the bundle"
+                            }
+                          }
+                        }
+                      ],
+                      "metadata": {
+                        "designer": {
+                          "x": 1800,
+                          "y": 0,
+                          "name": "Create order at 3PL"
+                        }
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "instant": true,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": true,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": true,
+      "freshVariables": false
+    },
+    "designer": {
+      "orphans": []
+    },
+    "zone": "eu1.make.com",
+    "notes": [
+      "DRAFT blueprint. Sequential + DLQ on: a failing order must not let later orders overtake it.",
+      "Replace YOUR-SERVICE-HOST, YOUR-ALERT-WEBHOOK, and YOUR-3PL-API before importing."
+    ]
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "order_ref": "AHG-2026-0142",
+  "customer": {
+    "name": "Rui Barreto"
+  },
+  "shipping_address": {
+    "line1": "Av. Central 220",
+    "city": "Porto Verde",
+    "postal_code": "",
+    "country_code": "Brazil"
+  },
+  "lines": [
+    { "sku": "AHG-LAMP-OAK", "quantity": 0 },
+    { "quantity": "2" }
+  ]
+}

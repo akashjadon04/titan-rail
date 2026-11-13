@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  titan-rail:
+    build: .
+    container_name: titan-rail-gateway
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=production
+      - LOG_LEVEL=info
+      - IDEMPOTENCY_TTL_SECONDS=86400
+      - SHIPPING_METHODS_PATH=/app/fixtures/shipping_methods.json
+    volumes:
+      - ./fixtures:/app/fixtures:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 3

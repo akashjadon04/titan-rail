@@ -1,0 +1,10 @@
+{
+  "event_id": "evt-cf-20260728-000917",
+  "event_type": "shipment.dispatched",
+  "payload": {
+    "order_ref": "AHG-2026-0143",
+    "tracking_number": "MP-7781-4402-US",
+    "carrier": "Marlin Post",
+    "dispatched_at": "2026-07-28T14:02:11Z"
+  }
+}

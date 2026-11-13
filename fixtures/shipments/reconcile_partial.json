@@ -1,0 +1,20 @@
+{
+  "order": {
+    "order_ref": "AHG-2026-0143",
+    "lines": [
+      { "sku": "AHG-MUG-BLUE", "quantity": 4 },
+      { "sku": "AHG-THROW-GRY", "quantity": 2 }
+    ]
+  },
+  "shipments": [
+    {
+      "tracking_number": "MP-7781-4402-US",
+      "carrier": "Marlin Post",
+      "lines": [
+        { "sku": "AHG-MUG-BLUE", "quantity": 4 },
+        { "sku": "AHG-THROW-GRY", "quantity": 1 }
+      ]
+    }
+  ],
+  "backorders": []
+}

@@ -1,0 +1,18 @@
+{
+  "order_ref": "AHG-2026-0141",
+  "customer": {
+    "name": "Dana Whitfield",
+    "email": "dana.whitfield@example.com"
+  },
+  "shipping_address": {
+    "line1": "18 Alder Row",
+    "city": "Springfield",
+    "postal_code": "04932",
+    "country_code": "US"
+  },
+  "shipping_method": "SM-STD-01",
+  "lines": [
+    { "sku": "AHG-MUG-BLUE", "quantity": 2 },
+    { "sku": "AHG-THROW-GRY", "quantity": 1 }
+  ]
+}

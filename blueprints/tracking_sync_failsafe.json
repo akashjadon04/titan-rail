@@ -1,0 +1,550 @@
+{
+  "name": "Tracking Sync Failsafe (DRAFT)",
+  "flow": [
+    {
+      "id": 1,
+      "module": "gateway:CustomWebHook",
+      "version": 1,
+      "parameters": {
+        "hook": null,
+        "maxResults": 1
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": {
+          "x": 0,
+          "y": 0,
+          "name": "3PL tracking event (webhook)"
+        }
+      }
+    },
+    {
+      "id": 12,
+      "module": "json:TransformToJSON",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "object": "{{1.payload.order_lines}}",
+        "space": ""
+      },
+      "metadata": {
+        "designer": {
+          "x": 120,
+          "y": -140,
+          "name": "Serialize order lines"
+        }
+      }
+    },
+    {
+      "id": 13,
+      "module": "json:TransformToJSON",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "object": "{{1.payload.shipments}}",
+        "space": ""
+      },
+      "metadata": {
+        "designer": {
+          "x": 240,
+          "y": -140,
+          "name": "Serialize shipments"
+        }
+      }
+    },
+    {
+      "id": 14,
+      "module": "json:TransformToJSON",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "object": "{{1.payload.backorders}}",
+        "space": ""
+      },
+      "metadata": {
+        "designer": {
+          "x": 360,
+          "y": -140,
+          "name": "Serialize backorders"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "module": "http:ActionSendData",
+      "version": 3,
+      "parameters": {
+        "handleErrors": true
+      },
+      "mapper": {
+        "url": "https://YOUR-SERVICE-HOST/webhook/events",
+        "method": "post",
+        "headers": [
+          {
+            "name": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "bodyType": "raw",
+        "parseResponse": true,
+        "contentType": "application/json",
+        "data": "{\"event_id\": \"{{1.event_id}}\", \"event_type\": \"{{1.event_type}}\"}",
+        "timeout": "30",
+        "serializeUrl": false,
+        "shareCookies": false,
+        "rejectUnauthorized": true,
+        "followRedirect": true,
+        "useQuerystring": false,
+        "gzip": true,
+        "useMtls": false,
+        "followAllRedirects": false
+      },
+      "onerror": [
+        {
+          "id": 21,
+          "module": "builtin:Break",
+          "version": 1,
+          "parameters": {
+            "count": 3,
+            "interval": 15,
+            "retry": true
+          },
+          "mapper": {},
+          "metadata": {
+            "designer": {
+              "x": 300,
+              "y": 300,
+              "name": "Idempotency gate down: retry, never process blind"
+            }
+          }
+        }
+      ],
+      "metadata": {
+        "designer": {
+          "x": 300,
+          "y": 0,
+          "name": "Idempotency gate (dedup by event_id)"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "module": "builtin:BasicRouter",
+      "version": 1,
+      "mapper": null,
+      "metadata": {
+        "designer": {
+          "x": 600,
+          "y": 0,
+          "name": "First delivery or replay?"
+        }
+      },
+      "routes": [
+        {
+          "flow": [
+            {
+              "id": 4,
+              "module": "http:ActionSendData",
+              "version": 3,
+              "filter": {
+                "name": "Replay: log and stop",
+                "conditions": [
+                  [
+                    {
+                      "a": "{{2.data.idempotent}}",
+                      "b": "true",
+                      "o": "text:equal"
+                    }
+                  ]
+                ]
+              },
+              "parameters": {
+                "handleErrors": true
+              },
+              "mapper": {
+                "url": "https://YOUR-ALERT-WEBHOOK/ops-log",
+                "method": "post",
+                "headers": [
+                  {
+                    "name": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "bodyType": "raw",
+                "parseResponse": false,
+                "contentType": "application/json",
+                "data": "{\"topic\": \"duplicate-delivery-skipped\", \"event_id\": \"{{1.event_id}}\", \"first_seen\": \"{{2.data.evidence.first_seen_utc}}\"}",
+                "timeout": "30",
+                "serializeUrl": false,
+                "shareCookies": false,
+                "rejectUnauthorized": true,
+                "followRedirect": true,
+                "useQuerystring": false,
+                "gzip": true,
+                "useMtls": false,
+                "followAllRedirects": false
+              },
+              "onerror": [
+                {
+                  "id": 41,
+                  "module": "builtin:Ignore",
+                  "version": 1,
+                  "parameters": {},
+                  "mapper": {},
+                  "metadata": {
+                    "designer": {
+                      "x": 1200,
+                      "y": 600,
+                      "name": "Log endpoint optional"
+                    }
+                  }
+                }
+              ],
+              "metadata": {
+                "designer": {
+                  "x": 900,
+                  "y": 300,
+                  "name": "Log duplicate, no side effects"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "flow": [
+            {
+              "id": 5,
+              "module": "http:ActionSendData",
+              "version": 3,
+              "filter": {
+                "name": "First delivery",
+                "conditions": [
+                  [
+                    {
+                      "a": "{{2.data.decision}}",
+                      "b": "ACCEPTED",
+                      "o": "text:equal"
+                    }
+                  ]
+                ]
+              },
+              "parameters": {
+                "handleErrors": true
+              },
+              "mapper": {
+                "url": "https://YOUR-SERVICE-HOST/shipments/reconcile",
+                "method": "post",
+                "headers": [
+                  {
+                    "name": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "bodyType": "raw",
+                "parseResponse": true,
+                "contentType": "application/json",
+                "data": "{\"order\": {\"order_ref\": \"{{1.payload.order_ref}}\", \"lines\": {{12.json}}}, \"shipments\": {{13.json}}, \"backorders\": {{14.json}}}",
+                "timeout": "30",
+                "serializeUrl": false,
+                "shareCookies": false,
+                "rejectUnauthorized": true,
+                "followRedirect": true,
+                "useQuerystring": false,
+                "gzip": true,
+                "useMtls": false,
+                "followAllRedirects": false
+              },
+              "onerror": [
+                {
+                  "id": 51,
+                  "module": "builtin:Break",
+                  "version": 1,
+                  "parameters": {
+                    "count": 3,
+                    "interval": 15,
+                    "retry": true
+                  },
+                  "mapper": {},
+                  "metadata": {
+                    "designer": {
+                      "x": 1200,
+                      "y": 300,
+                      "name": "Retry reconcile service"
+                    }
+                  }
+                }
+              ],
+              "metadata": {
+                "designer": {
+                  "x": 900,
+                  "y": 0,
+                  "name": "Reconcile shipment vs order"
+                }
+              }
+            },
+            {
+              "id": 6,
+              "module": "builtin:BasicRouter",
+              "version": 1,
+              "mapper": null,
+              "metadata": {
+                "designer": {
+                  "x": 1200,
+                  "y": 0,
+                  "name": "Route on reconcile decision"
+                }
+              },
+              "routes": [
+                {
+                  "flow": [
+                    {
+                      "id": 7,
+                      "module": "http:ActionSendData",
+                      "version": 3,
+                      "filter": {
+                        "name": "Fulfilled, partial, or backorder",
+                        "conditions": [
+                          [
+                            {
+                              "a": "{{5.data.decision}}",
+                              "b": "MISMATCH",
+                              "o": "text:notequal"
+                            }
+                          ]
+                        ]
+                      },
+                      "parameters": {
+                        "handleErrors": true
+                      },
+                      "mapper": {
+                        "url": "https://YOUR-ERP-API/orders/{{1.payload.order_ref}}/delivery-status",
+                        "method": "put",
+                        "headers": [
+                          {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                          }
+                        ],
+                        "bodyType": "raw",
+                        "parseResponse": true,
+                        "contentType": "application/json",
+                        "data": "{\"status\": \"{{5.data.decision}}\", \"order_ref\": \"{{1.payload.order_ref}}\", \"reason\": \"{{5.data.reason}}\"}",
+                        "timeout": "60",
+                        "serializeUrl": false,
+                        "shareCookies": false,
+                        "rejectUnauthorized": true,
+                        "followRedirect": true,
+                        "useQuerystring": false,
+                        "gzip": true,
+                        "useMtls": false,
+                        "followAllRedirects": false
+                      },
+                      "onerror": [
+                        {
+                          "id": 71,
+                          "module": "builtin:Break",
+                          "version": 1,
+                          "parameters": {
+                            "count": 5,
+                            "interval": 30,
+                            "retry": true
+                          },
+                          "mapper": {},
+                          "metadata": {
+                            "designer": {
+                              "x": 1800,
+                              "y": 300,
+                              "name": "Retry ERP update"
+                            }
+                          }
+                        }
+                      ],
+                      "metadata": {
+                        "designer": {
+                          "x": 1500,
+                          "y": 0,
+                          "name": "Update ERP with per-item status"
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "flow": [
+                    {
+                      "id": 8,
+                      "module": "http:ActionSendData",
+                      "version": 3,
+                      "filter": {
+                        "name": "Mismatch: human required",
+                        "conditions": [
+                          [
+                            {
+                              "a": "{{5.data.decision}}",
+                              "b": "MISMATCH",
+                              "o": "text:equal"
+                            }
+                          ]
+                        ]
+                      },
+                      "parameters": {
+                        "handleErrors": true
+                      },
+                      "mapper": {
+                        "url": "https://YOUR-ALERT-WEBHOOK/ops",
+                        "method": "post",
+                        "headers": [
+                          {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                          }
+                        ],
+                        "bodyType": "raw",
+                        "parseResponse": false,
+                        "contentType": "application/json",
+                        "data": "{\"topic\": \"shipment-mismatch-erp-update-held\", \"order_ref\": \"{{1.payload.order_ref}}\", \"reason\": \"{{5.data.reason}}\"}",
+                        "timeout": "30",
+                        "serializeUrl": false,
+                        "shareCookies": false,
+                        "rejectUnauthorized": true,
+                        "followRedirect": true,
+                        "useQuerystring": false,
+                        "gzip": true,
+                        "useMtls": false,
+                        "followAllRedirects": false
+                      },
+                      "onerror": [
+                        {
+                          "id": 81,
+                          "module": "builtin:Break",
+                          "version": 1,
+                          "parameters": {
+                            "count": 3,
+                            "interval": 15,
+                            "retry": true
+                          },
+                          "mapper": {},
+                          "metadata": {
+                            "designer": {
+                              "x": 1800,
+                              "y": 600,
+                              "name": "A mismatch alert must not be lost"
+                            }
+                          }
+                        }
+                      ],
+                      "metadata": {
+                        "designer": {
+                          "x": 1500,
+                          "y": 300,
+                          "name": "Alert human, hold the ERP write"
+                        }
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "flow": [
+            {
+              "id": 9,
+              "module": "http:ActionSendData",
+              "version": 3,
+              "filter": {
+                "name": "Rejected: no usable event_id",
+                "conditions": [
+                  [
+                    {
+                      "a": "{{2.data.decision}}",
+                      "b": "REJECTED",
+                      "o": "text:equal"
+                    }
+                  ]
+                ]
+              },
+              "parameters": {
+                "handleErrors": true
+              },
+              "mapper": {
+                "url": "https://YOUR-ALERT-WEBHOOK/ops",
+                "method": "post",
+                "headers": [
+                  {
+                    "name": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "bodyType": "raw",
+                "parseResponse": false,
+                "contentType": "application/json",
+                "data": "{\"topic\": \"tracking-event-rejected\", \"event_id\": \"{{1.event_id}}\", \"reason\": \"{{2.data.reason}}\"}",
+                "timeout": "30",
+                "serializeUrl": false,
+                "shareCookies": false,
+                "rejectUnauthorized": true,
+                "followRedirect": true,
+                "useQuerystring": false,
+                "gzip": true,
+                "useMtls": false,
+                "followAllRedirects": false
+              },
+              "onerror": [
+                {
+                  "id": 91,
+                  "module": "builtin:Break",
+                  "version": 1,
+                  "parameters": {
+                    "count": 3,
+                    "interval": 15,
+                    "retry": true
+                  },
+                  "mapper": {},
+                  "metadata": {
+                    "designer": {
+                      "x": 1200,
+                      "y": 900,
+                      "name": "A rejected event must not vanish"
+                    }
+                  }
+                }
+              ],
+              "metadata": {
+                "designer": {
+                  "x": 900,
+                  "y": 600,
+                  "name": "Alert ops: sender bug, event held"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "instant": true,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": false,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": true,
+      "freshVariables": false
+    },
+    "designer": {
+      "orphans": []
+    },
+    "zone": "eu1.make.com",
+    "notes": [
+      "DRAFT blueprint. The idempotency gate makes parallel execution safe, so sequential stays off here.",
+      "Replace YOUR-SERVICE-HOST, YOUR-ALERT-WEBHOOK, and YOUR-ERP-API before importing."
+    ]
+  }
+}

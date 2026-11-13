@@ -1,0 +1,36 @@
+{
+  "merchant": "Aurora Home Goods (fictional)",
+  "fulfillment_partner": "Cascade Fulfillment (fictional)",
+  "methods": [
+    {
+      "id": "SM-STD-01",
+      "name": "Standard Ground",
+      "carrier": "Marlin Post",
+      "aliases": ["standard", "ground", "standard shipping", "std"]
+    },
+    {
+      "id": "SM-EXP-02",
+      "name": "Express Air",
+      "carrier": "Veltro Express",
+      "aliases": ["express", "express shipping", "air express", "veltro"]
+    },
+    {
+      "id": "SM-ECO-03",
+      "name": "Economy Parcel",
+      "carrier": "Marlin Post",
+      "aliases": ["economy", "eco", "economy parcel", "cheapest"]
+    },
+    {
+      "id": "SM-INT-04",
+      "name": "International Priority",
+      "carrier": "Quickstep Freight",
+      "aliases": ["international", "intl priority", "priority international"]
+    },
+    {
+      "id": "SM-PUP-05",
+      "name": "Pickup Point",
+      "carrier": "Cascade Lockers",
+      "aliases": ["pickup", "locker", "pickup point", "click and collect", "click collect"]
+    }
+  ]
+}

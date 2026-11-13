@@ -1,0 +1,22 @@
+{
+  "order": {
+    "order_ref": "AHG-2026-0144",
+    "lines": [
+      { "sku": "AHG-LAMP-OAK", "quantity": 3 },
+      { "sku": "AHG-RUG-4X6", "quantity": 1 }
+    ]
+  },
+  "shipments": [
+    {
+      "tracking_number": "VX-0093-1177-INT",
+      "carrier": "Veltro Express",
+      "lines": [
+        { "sku": "AHG-LAMP-OAK", "quantity": 1 },
+        { "sku": "AHG-RUG-4X6", "quantity": 1 }
+      ]
+    }
+  ],
+  "backorders": [
+    { "sku": "AHG-LAMP-OAK", "quantity": 2, "eta": "2026-08-15" }
+  ]
+}

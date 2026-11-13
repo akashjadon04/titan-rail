@@ -1,0 +1,19 @@
+{
+  "order": {
+    "order_ref": "AHG-2026-0145",
+    "lines": [
+      { "sku": "AHG-MUG-BLUE", "quantity": 2 }
+    ]
+  },
+  "shipments": [
+    {
+      "tracking_number": "MP-7781-9915-US",
+      "carrier": "Marlin Post",
+      "lines": [
+        { "sku": "AHG-MUG-BLUE", "quantity": 5 },
+        { "sku": "AHG-CANDLE-VAN", "quantity": 1 }
+      ]
+    }
+  ],
+  "backorders": []
+}
