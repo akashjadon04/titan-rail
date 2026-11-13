@@ -91,10 +91,19 @@ def _default_clock() -> datetime:
 
 
 def _default_mapper() -> MethodMapper:
-    catalog_path = os.environ.get("MF_CATALOG_PATH")
+    catalog_path = os.environ.get("TITAN_RAIL_CATALOG_PATH") or os.environ.get("MF_CATALOG_PATH")
     if catalog_path:
         return MethodMapper(load_catalog(Path(catalog_path)))
     return MethodMapper(DEFAULT_METHODS)
+
+
+def _default_store_path() -> str:
+    env_path = os.environ.get("TITAN_RAIL_EVENT_DB") or os.environ.get("MF_EVENT_DB")
+    if env_path:
+        return env_path
+    db_dir = Path.home() / ".titan_rail"
+    db_dir.mkdir(parents=True, exist_ok=True)
+    return str(db_dir / "events.sqlite3")
 
 
 def create_app(
@@ -109,7 +118,7 @@ def create_app(
     active_store = (
         store
         if store is not None
-        else EventStore(os.environ.get("MF_EVENT_DB", "events.sqlite3"))
+        else EventStore(_default_store_path())
     )
     active_clock = clock if clock is not None else _default_clock
     validator = OrderValidator()
@@ -124,6 +133,7 @@ def create_app(
     )
 
     @app.get("/healthz", response_model=HealthResponse)
+    @app.get("/health", response_model=HealthResponse)
     def healthz() -> HealthResponse:
         return HealthResponse(
             decision="HEALTHY",

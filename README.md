@@ -92,11 +92,13 @@ The Titan Rail decision service runs as a stateless REST microservice:
 
 | Endpoint | HTTP Method | Description |
 | :--- | :---: | :--- |
-| `/api/v1/orders/validate` | `POST` | Validates ERP order structures against strict enterprise schema constraints. |
-| `/api/v1/orders/normalize` | `POST` | Maps shipping methods, addresses, and line-item structures into standardized 3PL payloads. |
-| `/api/v1/shipments/reconcile` | `POST` | Reconciles incoming warehouse shipment manifests against open ERP order lines. |
-| `/api/v1/webhooks/verify` | `POST` | Verifies incoming carrier webhook signatures and evaluates idempotency state. |
-| `/health` | `GET` | Service readiness probe and active catalog status check. |
+| `/healthz` / `/health` | `GET` | Service readiness probe and active catalog status check. |
+| `/orders/validate` | `POST` | Validates ERP order structures against strict enterprise schema constraints. |
+| `/map/shipping-method` | `POST` | Maps shipping methods, addresses, and carrier strings into standardized 3PL payloads. |
+| `/shipments/reconcile` | `POST` | Reconciles incoming warehouse shipment manifests against open ERP order lines. |
+| `/webhook/events` | `POST` | Ingress webhook deduplication engine with atomic SHA-256 event ID caching. |
+| `/orders` | `POST` | High-fidelity test sink simulating downstream 3PL order ingestion. |
+| `/ops` | `POST` | Operational alert test sink simulating Slack/PagerDuty exception triaging. |
 
 ---
 

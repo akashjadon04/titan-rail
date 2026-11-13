@@ -52,4 +52,7 @@ class EventStore:
         return inserted, str(row[0])
 
     def _connect(self) -> sqlite3.Connection:
+        path = Path(self._db_path)
+        if str(path) != ":memory:" and path.parent:
+            path.parent.mkdir(parents=True, exist_ok=True)
         return sqlite3.connect(self._db_path)
